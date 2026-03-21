@@ -17,6 +17,11 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/polakowo/vectorbt',
     packages=find_packages(),
+    entry_points={
+        "console_scripts": [
+            "bt=bttool.cli:main",
+        ],
+    },
     package_data={
         'vectorbt': ['templates/*.json']
     },
