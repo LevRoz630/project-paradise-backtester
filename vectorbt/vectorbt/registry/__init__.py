@@ -1,3 +1,3 @@
-from .registry import Registry
+from vectorbt.registry.registry import Registry
 
 __all__ = ["Registry"]
