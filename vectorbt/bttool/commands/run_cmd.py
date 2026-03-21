@@ -101,13 +101,24 @@ def run(args):
 
     print("Extracting metrics ...")
     try:
-        metrics = extract_metrics(portfolio)
+        from bttool.artifacts import extract_full_metrics
+        metrics = extract_full_metrics(portfolio)
     except Exception as e:
         print(f"Metrics error: {e}", file=sys.stderr)
         sys.exit(1)
 
     reg = Registry(base_dir=args.runs_dir)
     entry = reg.create(cfg, summary=metrics)
+
+    print("Saving artifacts ...")
+    from bttool.artifacts import save_artifacts
+    from pathlib import Path as _Path
+    run_dir = _Path(args.runs_dir) / entry.path
+    saved, errors = save_artifacts(run_dir, portfolio)
+    if errors:
+        print("\nVALIDATION WARNINGS:", file=sys.stderr)
+        for e in errors:
+            print(f"  {e}", file=sys.stderr)
 
     print()
     print(f"Run ID : {entry.run_id}")
@@ -117,6 +128,8 @@ def run(args):
     _print_metrics(metrics)
     print()
     print(f"Saved  : {entry.path}")
+    for name, path in saved.items():
+        print(f"         {Path(path).name}")
 
 
 def _print_metrics(metrics: Dict[str, Any]) -> None:

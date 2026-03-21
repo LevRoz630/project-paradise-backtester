@@ -45,11 +45,28 @@ def run(args):
     print()
 
     print("Metrics:")
-    _show_metric("Total Return",  metrics.get("total_return"),  "{:.2%}")
-    _show_metric("Sharpe Ratio",  metrics.get("sharpe_ratio"),  "{:.3f}")
-    _show_metric("Max Drawdown",  metrics.get("max_drawdown"),  "{:.2%}")
-    _show_metric("Win Rate",      metrics.get("win_rate"),      "{:.2%}")
-    _show_metric("Total Trades",  metrics.get("total_trades"),  "{}")
+    _show_metric("Total Return",      metrics.get("total_return"),      "{:.2%}")
+    _show_metric("Annualized Return", metrics.get("annualized_return"), "{:.2%}")
+    _show_metric("Sharpe Ratio",      metrics.get("sharpe_ratio"),      "{:.3f}")
+    _show_metric("Sortino Ratio",     metrics.get("sortino_ratio"),     "{:.3f}")
+    _show_metric("Max Drawdown",      metrics.get("max_drawdown"),      "{:.2%}")
+    _show_metric("Win Rate",          metrics.get("win_rate"),          "{:.2%}")
+    _show_metric("Profit Factor",     metrics.get("profit_factor"),     "{:.2f}")
+    _show_metric("Total Trades",      metrics.get("total_trades"),      "{}")
+    _show_metric("Avg Trade Return",  metrics.get("avg_trade_return"),  "{:.2%}")
+    print()
+
+    # Artifacts
+    import os
+    from pathlib import Path
+    run_path = Path(details.get("path", ""))
+    artifact_names = ["returns.parquet", "equity.parquet", "trades.csv",
+                      "metrics.json", "config.json", "report.html"]
+    found = [a for a in artifact_names if (run_path / a).exists()]
+    if found:
+        print("Artifacts:")
+        for a in found:
+            print(f"  {run_path / a}")
 
 
 def _resolve_run_id(reg, query: str) -> str:
