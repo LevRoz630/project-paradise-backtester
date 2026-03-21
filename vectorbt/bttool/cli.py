@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from bttool.commands import run_cmd, list_cmd, show_cmd, diff_cmd, report_cmd
+from bttool.commands import run_cmd, list_cmd, show_cmd, diff_cmd, report_cmd, permute_cmd
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     show_cmd.add_args(sub.add_parser("show", help="Display run details"))
     diff_cmd.add_args(sub.add_parser("diff", help="Compare two runs side-by-side"))
     report_cmd.add_args(sub.add_parser("report", help="Generate HTML report for a run"))
+    permute_cmd.add_args(sub.add_parser("permute", help="Run permutation test on a run"))
 
     return parser
 
@@ -33,7 +34,8 @@ def main():
         "list":   list_cmd.run,
         "show":   show_cmd.run,
         "diff":   diff_cmd.run,
-        "report": report_cmd.run,
+        "report":  report_cmd.run,
+        "permute": permute_cmd.run,
     }
     try:
         dispatch[args.command](args)
