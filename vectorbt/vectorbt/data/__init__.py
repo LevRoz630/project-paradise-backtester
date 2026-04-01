@@ -27,4 +27,5 @@ __all__ = [
     'AlphaVantageData'
 ]
 
+__blacklist__ = ['custom']
 __pdoc__ = {k: False for k in __all__}
