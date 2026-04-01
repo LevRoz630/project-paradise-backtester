@@ -9,6 +9,7 @@ from vectorbt.data.yfinance import YFData
 from vectorbt.data.binance import BinanceData
 from vectorbt.data.ccxt import CCXTData
 from vectorbt.data.alpaca import AlpacaData
+from vectorbt.data.csv import CSVData
 from vectorbt.data.updater import DataUpdater
 
 __all__ = [
@@ -20,7 +21,8 @@ __all__ = [
     'YFData',
     'BinanceData',
     'CCXTData',
-    'AlpacaData'
+    'AlpacaData',
+    'CSVData'
 ]
 
 __pdoc__ = {k: False for k in __all__}
