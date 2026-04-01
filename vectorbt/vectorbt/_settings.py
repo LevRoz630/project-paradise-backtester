@@ -163,6 +163,13 @@ settings = SettingsConfig(
             tz_convert=get_utc_tz(),
             missing_index='nan',
             missing_columns='raise',
+            alpha_vantage=Config(
+                dict(
+                    api_key=None,
+                    outputsize='full',
+                    rate_limit_sleep=12
+                )
+            ),
             alpaca=Config(
                 dict(
                     api_key=None,
