@@ -22,7 +22,7 @@ def run(args):
 
     runs = runs[: args.limit]
 
-    col_widths = {"run_id": 16, "date": 10, "symbol": 12, "sharpe": 8, "returns": 9}
+    col_widths = {"run_id": 19, "date": 10, "symbol": 12, "sharpe": 8, "returns": 9}
     header = (
         f"{'RUN_ID':<{col_widths['run_id']}}  "
         f"{'DATE':<{col_widths['date']}}  "
@@ -37,7 +37,7 @@ def run(args):
     for entry in runs:
         run_id_short = entry.run_id[:16] + "..."
         date = entry.timestamp[:10] if entry.timestamp else "-"
-        symbol = (entry.summary.get("symbol") or "-")[:col_widths["symbol"]]
+        symbol = (entry.symbol or "-")[:col_widths["symbol"]]
         sharpe = entry.summary.get("sharpe_ratio")
         ret = entry.summary.get("total_return")
 

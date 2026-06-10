@@ -18,6 +18,7 @@ class RunEntry:
     path: str  # relative path, e.g. "runs/<run_id>"
     summary: Dict[str, Any]
     strategy: str = ""  # strategy name or file path, for filtering
+    symbol: str = ""  # trading symbol, for display and filtering
 
 
 class FileStore:
@@ -107,6 +108,7 @@ class FileStore:
             path=rel_path,
             summary=summary,
             strategy=fields["strategy"] or "",
+            symbol=fields["symbol"] or "",
         )
         self._append_registry(entry, config=config)
         return entry
@@ -140,6 +142,7 @@ class FileStore:
                 path=r["path"],
                 summary=r.get("summary", {}),
                 strategy=r.get("strategy", ""),
+                symbol=r.get("symbol") or "",
             )
             for r in runs
         ]

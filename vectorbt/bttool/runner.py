@@ -41,7 +41,7 @@ def fetch_data(
             symbol,
             start=start,
             end=end,
-            timeframe=interval,
+            interval=interval,
         )
         return data.get()
 
@@ -51,7 +51,7 @@ def fetch_data(
         from vectorbt.data.custom import CCXTData
         data = CCXTData.download(
             symbol,
-            exchange_id=exchange,
+            exchange=exchange,
             start=start,
             end=end,
             timeframe=interval,

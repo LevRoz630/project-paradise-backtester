@@ -56,7 +56,7 @@ def _build_config(args) -> Dict[str, Any]:
 
 
 def run(args):
-    from bttool.runner import fetch_data, load_strategy, extract_metrics, _hash_dataframe
+    from bttool.runner import fetch_data, load_strategy, _hash_dataframe
     from vectorbt.registry import Registry
 
     cfg = _build_config(args)
@@ -112,8 +112,7 @@ def run(args):
 
     print("Saving artifacts ...")
     from bttool.artifacts import save_artifacts
-    from pathlib import Path as _Path
-    run_dir = _Path(args.runs_dir) / entry.path
+    run_dir = Path(args.runs_dir) / entry.path
     saved, errors = save_artifacts(run_dir, portfolio)
     if errors:
         print("\nVALIDATION WARNINGS:", file=sys.stderr)

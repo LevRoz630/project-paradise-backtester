@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -173,7 +173,7 @@ def generate_html_report(run_dir: Path, details: Dict[str, Any]) -> Path:
     start = data_cfg.get("start") or "-"
     end = data_cfg.get("end") or "-"
     strategy = strategy_cfg.get("name") or strategy_cfg.get("file") or "-"
-    generated = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     # Metric cards
     cards = [

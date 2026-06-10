@@ -10,8 +10,6 @@ def add_args(parser):
     parser.add_argument("--n", type=int, default=1000, dest="n_permutations",
                         help="Number of permutations (default: 1000)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
-    parser.add_argument("--jobs", type=int, default=1, dest="n_jobs",
-                        help="Parallel workers, -1 = all cores (default: 1)")
     parser.add_argument("--correction", choices=["bonferroni", "holm", "none"],
                         default="bonferroni", help="Multiple testing correction (default: bonferroni)")
     parser.add_argument("--runs-dir", default="bt_runs", help="Registry directory (default: bt_runs)")
@@ -77,7 +75,6 @@ def run(args):
         original_portfolio=original_portfolio,
         n_permutations=args.n_permutations,
         seed=args.seed,
-        n_jobs=args.n_jobs,
     )
 
     stats = compute_stats(results, correction=correction or "none")
@@ -92,7 +89,9 @@ def run(args):
     for metric, s in stats.items():
         if s.get("observed") is None:
             continue
-        p = s.get("p_value_adjusted") or s.get("p_value")
+        p = s.get("p_value_adjusted")
+        if p is None:
+            p = s.get("p_value")
         stars = significance_stars(p)
         print(
             f"{metric:<20}  "
