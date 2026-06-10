@@ -35,6 +35,34 @@ def _shuffle_signals(signals: pd.Series, rng: np.random.Generator) -> pd.Series:
     return pd.Series(shuffled_values, index=signals.index, name=signals.name)
 
 
+def _permute_prices(data: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """Permute per-bar log returns and rebuild the price path (Masters-style).
+
+    Preserves the return distribution and overall drift while destroying
+    temporal structure, so the strategy retains no timing edge under the null.
+    OHLC columns are scaled by the ratio of new to old close, keeping
+    intra-bar relationships intact.
+    """
+    if "Close" not in data.columns:
+        # Fallback: shuffle rows wholesale
+        shuffled = data.sample(frac=1, random_state=int(rng.integers(0, 2**31))).reset_index(drop=True)
+        shuffled.index = data.index
+        return shuffled
+
+    out = data.copy()
+    close = data["Close"].to_numpy(dtype=float)
+    log_returns = np.diff(np.log(close))
+    permuted = rng.permutation(log_returns)
+    new_close = np.empty_like(close)
+    new_close[0] = close[0]
+    new_close[1:] = close[0] * np.exp(np.cumsum(permuted))
+    ratio = new_close / close
+    for col in ("Open", "High", "Low", "Close"):
+        if col in out.columns:
+            out[col] = data[col].to_numpy(dtype=float) * ratio
+    return out
+
+
 def _extract_signals(portfolio) -> Optional[pd.Series]:
     """Try to extract the entry/exit signal series from a portfolio."""
     try:
@@ -61,13 +89,12 @@ def run_permutation_test(
     n_permutations: int = 1000,
     seed: int = 42,
     metrics: List[str] = ("sharpe_ratio", "total_return"),
-    n_jobs: int = 1,
 ) -> Dict[str, Any]:
     """Run permutation test and return raw results dict (without p-value correction).
 
-    Strategy must accept (data, signals) where signals is a pd.Series,
-    OR just (data) if it generates signals internally. We prefer the former.
-    Falls back to calling strategy_fn(data) and shuffling portfolio returns.
+    If the strategy accepts (data, signals), entry/exit signals extracted from
+    the original portfolio are shuffled. Otherwise the price path is permuted
+    (log returns shuffled and recompounded) and the strategy re-run on it.
     """
     rng = np.random.default_rng(seed)
     metrics = list(metrics)
@@ -89,12 +116,10 @@ def run_permutation_test(
                 shuffled = _shuffle_signals(signals, rng)
                 pf = strategy_fn(data, shuffled)
             else:
-                # Shuffle the data rows to randomise timing
-                shuffled_data = data.sample(frac=1, random_state=rng.integers(0, 2**31)).reset_index(drop=True)
-                shuffled_data.index = data.index
+                permuted_data = _permute_prices(data, rng)
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    pf = strategy_fn(shuffled_data)
+                    pf = strategy_fn(permuted_data)
             for m in metrics:
                 v = _get_metric(pf, m)
                 if v is not None:

@@ -57,9 +57,8 @@ def run(args):
     print()
 
     # Artifacts
-    import os
     from pathlib import Path
-    run_path = Path(details.get("path", ""))
+    run_path = Path(args.runs_dir) / details.get("path", "")
     artifact_names = ["returns.parquet", "equity.parquet", "trades.csv",
                       "metrics.json", "config.json", "report.html"]
     found = [a for a in artifact_names if (run_path / a).exists()]

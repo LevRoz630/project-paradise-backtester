@@ -93,6 +93,14 @@ def test_list_filter_by_symbol(reg, base_config):
     assert len(reg.list()) == 2
 
 
+def test_list_entries_carry_symbol_and_strategy(reg, base_config):
+    reg.create(base_config, summary={"sharpe_ratio": 1.2, "total_return": 0.15})
+
+    entries = reg.list()
+    assert entries[0].symbol == "BTC/USDT"
+    assert entries[0].strategy == "buy_and_hold"
+
+
 def test_list_sort_by_sharpe(reg, base_config):
     configs = [
         ({**base_config, "execution": {"fees_bps": i}}, {"sharpe_ratio": v, "total_return": 0.1})
