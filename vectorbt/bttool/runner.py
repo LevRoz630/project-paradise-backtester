@@ -36,7 +36,7 @@ def fetch_data(
         return df
 
     if source == "yfinance":
-        from vectorbt.data.custom import YFData
+        from vectorbt.data import YFData
         data = YFData.download(
             symbol,
             start=start,
@@ -48,7 +48,7 @@ def fetch_data(
     if source == "ccxt":
         if not exchange:
             raise ValueError("--exchange is required for source=ccxt")
-        from vectorbt.data.custom import CCXTData
+        from vectorbt.data import CCXTData
         data = CCXTData.download(
             symbol,
             exchange=exchange,
