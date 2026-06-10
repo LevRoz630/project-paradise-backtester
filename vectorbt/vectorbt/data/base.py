@@ -258,6 +258,7 @@ Name: group, dtype: object
 ![](/assets/images/data_plots.svg)
 """
 
+import logging
 import warnings
 
 import numpy as np
@@ -274,6 +275,8 @@ from vectorbt.utils.datetime_ import is_tz_aware, to_timezone
 from vectorbt.utils.decorators import cached_method
 
 __pdoc__ = {}
+logger = logging.getLogger(__name__)
+OHLCV_COLUMNS = ('Open', 'High', 'Low', 'Close', 'Volume')
 
 
 class symbol_dict(dict):
@@ -290,6 +293,9 @@ DataT = tp.TypeVar("DataT", bound="Data")
 
 class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
+
+    _validate_on_download = False
+    _expected_freq = None
 
     def __init__(self,
                  wrapper: ArrayWrapper,
@@ -323,6 +329,123 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         self._missing_index = missing_index
         self._missing_columns = missing_columns
         self._download_kwargs = download_kwargs
+
+    @classmethod
+    def _prepare_symbol(cls, df: tp.SeriesFrame) -> tp.Frame:
+        """Normalize and validate a downloaded OHLCV frame."""
+        df = cls._normalize(df)
+        cls._validate_schema(df)
+        cls._validate_ohlc_logic(df)
+        return df
+
+    @classmethod
+    def _normalize(cls, df: tp.SeriesFrame) -> tp.Frame:
+        """Keep canonical OHLCV columns and cast them to float."""
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError("Validated data must be a pandas DataFrame with OHLCV columns")
+        missing_columns = [column for column in OHLCV_COLUMNS if column not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing OHLCV columns: {missing_columns}")
+        return df.loc[:, OHLCV_COLUMNS].astype(float)
+
+    @classmethod
+    def _validate_schema(cls, df: tp.Frame) -> None:
+        """Validate the canonical OHLCV schema."""
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError("Validated data must be a pandas DataFrame with OHLCV columns")
+        missing_columns = [column for column in OHLCV_COLUMNS if column not in df.columns]
+        extra_columns = [column for column in df.columns if column not in OHLCV_COLUMNS]
+        if missing_columns or extra_columns:
+            raise ValueError(
+                f"Expected canonical OHLCV columns {list(OHLCV_COLUMNS)}, got {list(df.columns)}"
+            )
+        wrong_dtypes = {
+            column: str(df[column].dtype)
+            for column in OHLCV_COLUMNS
+            if not pd.api.types.is_float_dtype(df[column])
+        }
+        if wrong_dtypes:
+            raise ValueError(f"Expected float OHLCV columns, got {wrong_dtypes}")
+
+    @classmethod
+    def _validate_ohlc_logic(cls, df: tp.Frame) -> None:
+        """Warn about rows where OHLC relationships are inconsistent."""
+        invalid_mask = (
+            (df['High'] < df[['Open', 'Close', 'Low']].max(axis=1))
+            | (df['Low'] > df[['Open', 'Close', 'High']].min(axis=1))
+        )
+        if not invalid_mask.any():
+            return
+        invalid_index = [str(index) for index in df.index[invalid_mask][:3]]
+        logger.warning(
+            "OHLC validation failed for %d rows%s",
+            int(invalid_mask.sum()),
+            f" at {', '.join(invalid_index)}" if invalid_index else ""
+        )
+
+    @classmethod
+    def _validate_timezone(cls, df: tp.SeriesFrame) -> None:
+        """Warn if a DatetimeIndex is still not UTC after timezone conversion."""
+        if not isinstance(df.index, pd.DatetimeIndex):
+            return
+        if not is_tz_aware(df.index):
+            logger.warning("Expected UTC DatetimeIndex after timezone conversion, but index is tz-naive")
+            return
+        tz_name = getattr(df.index.tz, 'zone', None) or str(df.index.tz)
+        if tz_name not in ('UTC', 'UTC+00:00', '+00:00', 'tzutc()'):
+            logger.warning("Expected UTC DatetimeIndex after timezone conversion, got %s", tz_name)
+
+    @classmethod
+    def _detect_gaps(cls,
+                     df: tp.SeriesFrame,
+                     freq: tp.Optional[tp.FrequencyLike]) -> tp.List[tp.Tuple[pd.Timestamp, pd.Timestamp]]:
+        """Warn about missing bars for an explicitly configured frequency."""
+        if freq is None or not isinstance(df.index, pd.DatetimeIndex) or len(df.index) < 2:
+            return []
+        offset = pd.tseries.frequencies.to_offset(freq)
+        expected_index = pd.date_range(start=df.index[0], end=df.index[-1], freq=offset, tz=df.index.tz)
+        missing = expected_index.difference(df.index)
+        if missing.empty:
+            return []
+        gap_ranges = []
+        gap_start = missing[0]
+        gap_prev = missing[0]
+        for timestamp in missing[1:]:
+            if timestamp != gap_prev + offset:
+                gap_ranges.append((gap_start, gap_prev))
+                gap_start = timestamp
+            gap_prev = timestamp
+        gap_ranges.append((gap_start, gap_prev))
+        formatted_ranges = []
+        for start, end in gap_ranges:
+            if start == end:
+                formatted_ranges.append(str(start))
+            else:
+                formatted_ranges.append(f"{start} -> {end}")
+        logger.warning(
+            "Detected %d missing bars for expected frequency %s: %s",
+            len(missing),
+            freq,
+            ", ".join(formatted_ranges)
+        )
+        return gap_ranges
+
+    def _detect_boundary_gap(self, old_tail: tp.Any, new_head: tp.Any) -> bool:
+        """Warn about a gap between the last existing and first incoming bar."""
+        if self._expected_freq is None:
+            return False
+        if not isinstance(old_tail, pd.Timestamp) or not isinstance(new_head, pd.Timestamp):
+            return False
+        offset = pd.tseries.frequencies.to_offset(self._expected_freq)
+        if new_head > old_tail + offset:
+            logger.warning(
+                "Detected boundary gap for expected frequency %s between %s and %s",
+                self._expected_freq,
+                old_tail,
+                new_head
+            )
+            return True
+        return False
 
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
@@ -502,6 +625,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             missing_columns = data_cfg['missing_columns']
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
+        if 'download_kwargs' not in kwargs or kwargs['download_kwargs'] is None:
+            kwargs['download_kwargs'] = {}
 
         data = data.copy()
         for k, v in data.items():
@@ -520,6 +645,9 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                         v = v.tz_localize(to_timezone(tz_localize))
                 if tz_convert is not None:
                     v = v.tz_convert(to_timezone(tz_convert))
+                if cls._validate_on_download:
+                    cls._validate_timezone(v)
+                    cls._detect_gaps(v, cls._expected_freq)
                 v.index.freq = v.index.inferred_freq
             data[k] = v
 
@@ -582,6 +710,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
             # Download data for this symbol
             data[s] = cls.download_symbol(s, **_kwargs)
+            if cls._validate_on_download:
+                data[s] = cls._prepare_symbol(data[s])
 
         # Create new instance from data
         return cls.from_data(
@@ -615,6 +745,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
             # Download new data for this symbol
             new_obj = self.update_symbol(k, **_kwargs)
+            if self._validate_on_download:
+                new_obj = self._prepare_symbol(new_obj)
 
             # Convert array to pandas
             if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
@@ -636,6 +768,11 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                         new_obj = new_obj.tz_localize(to_timezone(self.tz_localize))
                 if self.tz_convert is not None:
                     new_obj = new_obj.tz_convert(to_timezone(self.tz_convert))
+                if self._validate_on_download:
+                    self._validate_timezone(new_obj)
+                    self._detect_gaps(new_obj, self._expected_freq)
+                    if len(v.index) > 0 and len(new_obj.index) > 0:
+                        self._detect_boundary_gap(v.index[-1], new_obj.index[0])
 
             new_data[k] = new_obj
 
