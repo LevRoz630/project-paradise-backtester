@@ -110,7 +110,8 @@ diff = reg.compare(run_id_1, run_id_2)
 
 ```bash
 cd vectorbt
-python -m pytest tests/test_registry.py tests/test_permutation.py
+python -m pytest tests/test_registry.py tests/test_permutation.py \
+                 tests/test_data_compat.py tests/test_data_validation.py tests/test_data_sources.py
 ```
 
 ## Documentation
